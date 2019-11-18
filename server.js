@@ -36,6 +36,8 @@ let transporter = nodemailer.createTransport({
   }
 });
 
+const dbpath = "./database/app.db"
+
 // create application routes
 
 app.post("/register", multipartMiddleware, function(req, res) {
@@ -53,7 +55,7 @@ app.post("/register", multipartMiddleware, function(req, res) {
   }
 
   bcrypt.hash(req.body.password, saltRounds, function(err, hash) {
-    let db = new sqlite3.Database("./database/InvoicingApp.db");
+    let db = new sqlite3.Database(dbpath);
     let sql = `INSERT INTO users(name,email,company_name,password) VALUES('${
       req.body.name
     }','${req.body.email}','${req.body.company_name}','${hash}')`;
@@ -92,7 +94,7 @@ app.post("/register", multipartMiddleware, function(req, res) {
 });
 
 app.post("/login", multipartMiddleware, function(req, res) {
-  let db = new sqlite3.Database("./database/InvoicingApp.db");
+  let db = new sqlite3.Database(dbpath);
   let sql = `SELECT * from users where email='${req.body.email}'`;
   db.all(sql, [], (err, rows) => {
     if (err) {
@@ -173,7 +175,7 @@ app.post("/sendmail", multipartMiddleware, function(req, res) {
   let mailOptions = {
     from: "COMPANYEMAIL@gmail.com",
     to: recipient.email,
-    subject: `Hi, ${recipient.name}. Here's an Invoice from ${
+    subject: `Hi, ${recipient.name}. Here's an message from ${
       sender.company_name
     }`,
     text: `You owe ${sender.company_name}`
@@ -195,65 +197,79 @@ app.post("/sendmail", multipartMiddleware, function(req, res) {
   });
 });
 
-app.post("/invoice", multipartMiddleware, function(req, res) {
-  let txn_names = req.body.txn_names.split(",");
-  let txn_prices = req.body.txn_prices.split(",");
+app.post("/stories", multipartMiddleware, function(req, res) {
+ 
   // validate data
-  if (isEmpty(req.body.name)) {
+  if (isEmpty(req.body.title)) {
     return res.json({
       status: false,
-      message: "Invoice needs a name"
+      message: "Story requires title"
     });
   }
 
   // perform other checks
 
-  // create invoice
-  let db = new sqlite3.Database("./database/InvoicingApp.db");
-  let sql = `INSERT INTO invoices(name,user_id,paid) VALUES('${
-    req.body.name
-  }','${req.body.user_id}','0')`;
+  // create story
+  let db = new sqlite3.Database(dbpath);
+  let sql = `INSERT INTO stories(title,body,favorite) VALUES('${req.body.title}','${req.body.body}', '${req.body.favorite}')`;
   
   db.serialize(function() {
     db.run(sql, function(err) {
       if (err) {
         return res.json({
           status: false,
-          message: "Sorry, there was an error creating your invoice :("
+          message: "Sorry, there was an error creating your story :("
         });
       }
 
-      let invoice_id = this.lastID;
-      for (let i = 0; i < txn_names.length; i++) {
-        let query = `INSERT INTO transactions(name,price,invoice_id) VALUES(
-            '${txn_names[i]}',
-            '${txn_prices[i]}',
-            '${invoice_id}'
-        )`;
-        db.run(query, function(err) {
-          if (err) {
-            error = TRUE;
-            return res.json({
-              status: false,
-              message: "Sorry, there was an error creating your invoice :("
-            });
-          } 
-        });
-      }
       return res.json({
         status: true,
-        message: "Invoice created"
+        message: "Story created"
       });
     });
   });
 });
 
-app.get("/invoice/user/:user_id", multipartMiddleware, function(req, res) {
-  let db = new sqlite3.Database("./database/InvoicingApp.db");
-  let sql = `SELECT * FROM invoices 
-  WHERE user_id='${req.params.user_id}'`;
+app.put("/stories/:id", multipartMiddleware, function(req, res) {
+ 
+  // validate data
+  if (isEmpty(req.body.title)) {
+    return res.json({
+      status: false,
+      message: "Story requires title"
+    });
+  }
 
-  // LEFT JOIN transactions ON invoices.id=transactions.invoice_id
+  // perform other checks
+
+  // create story
+  let db = new sqlite3.Database(dbpath);
+  let sql = `UPDATE stories 
+  SET title='${req.body.title}',body='${req.body.body}', favorite='${req.body.favorite}' 
+  WHERE id=${req.params.id};`;
+  
+  db.serialize(function() {
+    db.run(sql, function(err) {
+      if (err) {
+        return res.json({
+          status: false,
+          message: "Sorry, there was an error updating your Story :(",
+          error: JSON.stringify(err)
+        });
+      }
+
+      return res.json({
+        status: true,
+        message: "Story updated"
+      });
+    });
+  });
+});
+
+app.get("/stories", multipartMiddleware, function(req, res) {
+  let db = new sqlite3.Database(dbpath);
+  let sql = `SELECT * FROM stories`;
+
 
   db.all(sql, [], (err, rows) => {
     if (err) {
@@ -261,44 +277,33 @@ app.get("/invoice/user/:user_id", multipartMiddleware, function(req, res) {
     }
     return res.json({
       status: true,
-      invoices: rows
+      stories: rows
     });
   });
 });
 
-app.get("/invoice/user/:user_id/:invoice_id", multipartMiddleware, function(
+app.get("/stories/:id", multipartMiddleware, function(
   req,
   res
 ) {
-  let db = new sqlite3.Database("./database/InvoicingApp.db");
-  let sql = `SELECT * FROM invoices WHERE user_id='${
-    req.params.user_id
-  }' AND id='${req.params.invoice_id}'`;
+  let db = new sqlite3.Database(dbpath);
+  let sql = `SELECT * FROM stories WHERE id='${req.params.id}'`;
 
   db.all(sql, [], (err, rows) => {
     if (err) {
       throw err;
     }
-    let invoice = rows[0];
-    let fetchInvoiceDataSql = `SELECT * FROM transactions WHERE invoice_id='${
-      req.params.invoice_id
-    }'`;
-    db.all(fetchInvoiceDataSql, [], (err, rows) => {
-      if (err) {
-        throw err;
-      }
+    let story = rows[0];
 
       return res.json({
         status: true,
-        invoice: invoice,
-        transactions: rows
-      });
+        story: story,
     });
   });
 });
 
 app.get("/", function(req, res) {
-  res.send("<h1>Welcome to Invoicing App</h1>");
+  res.send("<h1>Welcome</h1>");
 });
 
 app.listen(PORT, function() {

@@ -1,30 +1,19 @@
 <template>
   <div class="container-fluid" style="padding: 0px;">
-    <Header v-bind:user="user"/>
-    <template v-if="this.isactive == 'create'">
-      <CreateInvoice />
-    </template>
-    <template v-else>
-      <ViewInvoices />
-    </template>
+    <StoryList v-bind:favorites="true"/>
   </div>
 </template>
 
 <script>
-import Header from "./Header";
-import CreateInvoice from "./CreateInvoice";
-import ViewInvoices from "./ViewInvoices";
+import StoryList from "./StoryList";
 export default {
   name: "Dashboard",
   components: {
-    Header,
-    CreateInvoice,
-    ViewInvoices,
+    StoryList,
   },
   data() {
     return {
-      isactive: 'create',
-      title: "Invoicing App",
+      title: "App",
       user : (this.$route.params.user) ? this.$route.params.user : null
     };
   },
